@@ -1,0 +1,60 @@
+{
+  "name": "elementarywatson",
+  "displayName": "ElementaryWatson",
+  "description": "VS Code extension that displays inline translation values for Paraglide JS i18n method calls in Svelte/SvelteKit applications",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "1.99.3"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:svelte"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "ElementaryWatson",
+      "properties": {
+        "elementaryWatson.defaultLocale": {
+          "type": "string",
+          "default": "en",
+          "description": "Default locale for displaying translation labels. If not set, will use the baseLocale from project.inlang settings or fallback to 'en'.",
+          "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+          "patternErrorMessage": "Locale must be in format 'en' or 'en-US'"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "elementaryWatson.changeLocale",
+        "title": "Change Label Locales",
+        "category": "ElementaryWatson"
+      },
+      {
+        "command": "elementaryWatson.extractText",
+        "title": "Extract Text to Locale",
+        "category": "ElementaryWatson"
+      }
+    ]
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.102.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1"
+  },
+  "dependencies": {
+    "human-id": "^4.1.1"
+  }
+}
