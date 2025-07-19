@@ -6,17 +6,19 @@ A VS Code extension that displays inline translation values for i18n method call
 
 - **Inline Translation Display**: Shows the actual translation text next to `m.methodName()` calls in a faded, italic style
 - **Real-time Updates**: Automatically updates translation displays when you save JS/TS files
-- **Import Resolution**: Follows import statements to locate your translation modules
-- **SvelteKit Alias Support**: Properly resolves SvelteKit aliases like `$lib`, `$app`
-- **Multiple Import Patterns**: Supports various import styles:
-  - `import * as m from './translations'`
-  - `import { m } from './translations'`
-  - `import m from './translations'`
-  - `import * as m from '$lib/paraglide/messages'` (SvelteKit)
-- **Parameter Support**: Handles translation methods with parameters
 - **Multi-language Support**: Works with multiple locales and configurable locale switching
 - **inlang Project Support**: Automatically detects and uses inlang project configuration
 - **Flexible Configuration**: Command palette integration for easy locale switching
+
+## Motivation & Disclaimer
+
+I created this extension for my own development workflow because I was experiencing issues with the Sherlock VS Code extension from project.inlang - it was occasionally modifying my message files and deleting keys randomly. I needed a reliable way to use Paraglide JS in VS Code without worrying about unintended file modifications.
+
+**Important**: This is not a criticism of project.inlang or their excellent work. On the contrary, I'm deeply grateful to them for creating Paraglide JS, which has been instrumental in making i18n development so much better in my applications. Big thanks to the project.inlang team! 🙏
+
+I built ElementaryWatson as an alternative that focuses purely on displaying and extracting translation values with minimal modification of your message files. If anyone else finds this approach useful, I'm happy to help.
+
+**Note**: This is a quick side project I built for my own needs. Use it at your own risk! (Though realistically, there's minimal risk since it's just a local extension that displays and extracts strings - no major modifications to your codebase. 😄)
 
 ## Project Structure Support
 
