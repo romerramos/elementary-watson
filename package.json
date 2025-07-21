@@ -3,6 +3,10 @@
   "displayName": "ElementaryWatson",
   "icon": "icon.png",
   "publisher": "romerramos",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/romerramos/elementary-watson.git"
+  },
   "author": {
     "name": "Romer"
   },
