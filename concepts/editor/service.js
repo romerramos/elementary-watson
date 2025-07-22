@@ -56,10 +56,16 @@ class EditorService {
                 workspaceFolder.uri.fsPath, 
                 currentLocale
             );
-            if (!translations) return;
 
-            // Process translation calls to get resolved values
-            const translationResults = this.translationService.processTranslationCalls(translationCalls, translations);
+            // Process translation calls to get resolved values with warning states
+            // Note: We process even if translations is null to show warning labels
+            const translationResults = await this.translationService.processTranslationCallsWithWarnings(
+                translationCalls, 
+                translations || {}, 
+                workspaceFolder.uri.fsPath,
+                currentLocale
+            );
+            
             if (translationResults.length === 0) {
                 // Clear CodeLens when no translation results are found
                 this.codeLensProvider.updateTranslationResults(document, []);
@@ -74,9 +80,15 @@ class EditorService {
             this.codeLensProvider.updateTranslationResults(document, translationResults);
 
             // Log the results
-            const translationValues = translationResults.map(result => 
-                `${result.methodName}: "${result.translationValue}"`
-            );
+            const translationValues = translationResults.map(result => {
+                if (result.warningType === 'noLocale') {
+                    return `${result.methodName}: ❌ no locale defined`;
+                } else if (result.warningType === 'missingLocale') {
+                    return `${result.methodName}: ⚠️ "${result.translationValue}" (missing in ${currentLocale}, found in ${result.foundInLocale})`;
+                } else {
+                    return `${result.methodName}: "${result.translationValue}"`;
+                }
+            });
             console.log(`💡 Updated translation labels and navigation (${currentLocale}): ${translationValues.join(', ')}`);
 
         } catch (error) {

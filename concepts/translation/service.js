@@ -108,6 +108,88 @@ class TranslationService {
     }
 
     /**
+     * Search for a translation key across all available locales
+     * @param {string} workspacePath The workspace root path
+     * @param {string} key The translation key to search for
+     * @param {string} currentLocale The current locale to exclude from search
+     * @returns {Promise<Object|null>} Object with {translation, locale} if found, null otherwise
+     */
+    async searchKeyInAllLocales(workspacePath, key, currentLocale) {
+        try {
+            const inlangSettings = this.localeService.loadInlangSettings(workspacePath);
+            const availableLocales = inlangSettings?.locales || ['en'];
+            
+            // Search through all locales except the current one
+            for (const locale of availableLocales) {
+                if (locale === currentLocale) continue;
+                
+                const translations = await this.loadTranslationsForLocale(workspacePath, locale);
+                if (translations) {
+                    const translationValue = this.getTranslation(translations, key);
+                    if (translationValue) {
+                        return {
+                            translation: translationValue,
+                            locale: locale
+                        };
+                    }
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Error searching key in all locales:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Process translation calls and return their resolved values with warning states
+     * @param {Array} translationCalls Array of translation call objects
+     * @param {Object} translations The translations object for current locale
+     * @param {string} workspacePath The workspace root path
+     * @param {string} currentLocale The current locale
+     * @returns {Promise<Array>} Array of objects with call info, translation values, and warning states
+     */
+    async processTranslationCallsWithWarnings(translationCalls, translations, workspacePath, currentLocale) {
+        const results = [];
+        
+        for (const call of translationCalls) {
+            const currentTranslation = this.getTranslation(translations, call.methodName);
+            
+            if (currentTranslation) {
+                // Translation found in current locale - normal case
+                results.push({
+                    ...call,
+                    translationValue: currentTranslation,
+                    warningType: null
+                });
+            } else {
+                // Translation missing in current locale - search other locales
+                const searchResult = await this.searchKeyInAllLocales(workspacePath, call.methodName, currentLocale);
+                
+                if (searchResult) {
+                    // Found in other locale(s) - show yellow warning
+                    results.push({
+                        ...call,
+                        translationValue: searchResult.translation,
+                        warningType: 'missingLocale',
+                        foundInLocale: searchResult.locale
+                    });
+                } else {
+                    // Not found in any locale - show red error
+                    results.push({
+                        ...call,
+                        translationValue: null,
+                        warningType: 'noLocale'
+                    });
+                }
+            }
+        }
+        
+        return results;
+    }
+
+    /**
      * Process translation calls and return their resolved values
      * @param {Array} translationCalls Array of translation call objects
      * @param {Object} translations The translations object

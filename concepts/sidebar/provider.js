@@ -1,4 +1,6 @@
 const vscode = require('vscode');
+const { LocaleService } = require('../locale/service');
+const { TranslationService } = require('../translation/service');
 
 /**
  * Tree data provider for the ElementaryWatson sidebar
@@ -6,6 +8,8 @@ const vscode = require('vscode');
 class SidebarTreeProvider {
     constructor(sidebarService) {
         this.sidebarService = sidebarService;
+        this.localeService = new LocaleService();
+        this.translationService = new TranslationService();
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
         this.translationData = [];
@@ -105,10 +109,30 @@ class SidebarTreeProvider {
      */
     async getChildren(element) {
         if (!element) {
-            // Return only translation keys (no fake title header)
-            return this.translationData.map(keyData => 
-                new TranslationKeyNode(keyData.key, keyData.locales.length)
-            );
+            // Get current locale and workspace path
+            const currentLocale = this.localeService.getCurrentLocale();
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            
+            if (!workspaceFolder) {
+                return this.translationData.map(keyData => 
+                    new TranslationKeyNode(keyData.key, keyData.locales.length)
+                );
+            }
+            
+            const workspacePath = workspaceFolder.uri.fsPath;
+            
+            // Load current locale translations
+            const currentTranslations = await this.translationService.loadTranslationsForLocale(workspacePath, currentLocale);
+            
+            // Return translation keys with current locale values
+            return this.translationData.map(keyData => {
+                let currentValue = null;
+                if (currentTranslations) {
+                    currentValue = this.translationService.getTranslation(currentTranslations, keyData.key);
+                }
+                
+                return new TranslationKeyNode(keyData.key, keyData.locales.length, currentValue);
+            });
         }
 
         if (element instanceof TranslationKeyNode) {
@@ -136,10 +160,18 @@ class SidebarTreeProvider {
  * Tree node for translation keys
  */
 class TranslationKeyNode extends vscode.TreeItem {
-    constructor(key, localeCount) {
+    constructor(key, localeCount, currentValue = null) {
         super(key, vscode.TreeItemCollapsibleState.Collapsed);
         this.key = key;
-        this.description = `${localeCount} ${localeCount === 1 ? 'locale' : 'locales'}`;
+        
+        if (currentValue) {
+            // Truncate long values for display
+            const displayValue = currentValue.length > 40 ? currentValue.substring(0, 37) + '...' : currentValue;
+            this.description = `"${displayValue}" • ${localeCount} ${localeCount === 1 ? 'locale' : 'locales'}`;
+        } else {
+            this.description = `(no value) • ${localeCount} ${localeCount === 1 ? 'locale' : 'locales'}`;
+        }
+        
         this.contextValue = 'translationKey';
         // No icon for cleaner look
     }
@@ -152,7 +184,7 @@ class TranslationItemNode extends vscode.TreeItem {
     constructor(locale, value, key, workspacePath) {
         // Truncate long values for display
         const displayValue = value.length > 50 ? value.substring(0, 47) + '...' : value;
-        const label = `${locale}: "${displayValue}"`;
+        const label = `[${locale}] "${displayValue}"`;
         
         super(label, vscode.TreeItemCollapsibleState.None);
         

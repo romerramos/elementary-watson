@@ -37,6 +37,25 @@ class EditorDecorator {
         const decorations = [];
         
         for (const result of translationResults) {
+            let contentText, color, borderColor;
+            
+            if (result.warningType === 'noLocale') {
+                // Red alert for no locale defined
+                contentText = 'No locale defined';
+                color = '#cc6666';
+                borderColor = '#cc6666';
+            } else if (result.warningType === 'missingLocale') {
+                // Yellow warning + translation from other locale
+                contentText = `"${result.translationValue}" (locales missing)`;
+                color = '#d4a574';
+                borderColor = '#d4a574';
+            } else {
+                // Normal case - translation found in current locale
+                contentText = `"${result.translationValue}"`;
+                color = '#888888';
+                borderColor = '#888888';
+            }
+            
             const decoration = {
                 range: new vscode.Range(
                     document.positionAt(result.end),
@@ -44,10 +63,10 @@ class EditorDecorator {
                 ),
                 renderOptions: {
                     after: {
-                        contentText: `"${result.translationValue}"`,
-                        color: '#888888',
+                        contentText: contentText,
+                        color: color,
                         fontStyle: 'italic',
-                        border: '1px solid #888888',
+                        border: `1px solid ${borderColor}`,
                         borderRadius: '4px',
                         padding: '2px 4px',
                         margin: '0 2px',
