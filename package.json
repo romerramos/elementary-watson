@@ -96,22 +96,8 @@
         "command": "elementaryWatson.openTranslationFile",
         "title": "Open Translation File",
         "icon": "$(target)"
-      },
-      {
-        "command": "elementaryWatson.refreshSidebar",
-        "title": "Refresh",
-        "icon": "$(refresh)"
       }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "elementaryWatson.refreshSidebar",
-          "when": "view == elementaryWatsonSidebar",
-          "group": "navigation"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "lint": "eslint .",

@@ -166,17 +166,6 @@ class ExtensionActivator {
      * Register sidebar-related commands
      */
     registerSidebarCommands() {
-        // Register refresh command
-        const refreshCommand = vscode.commands.registerCommand('elementaryWatson.refreshSidebar', async () => {
-            const activeEditor = vscode.window.activeTextEditor;
-            if (activeEditor && this.editorService.isSupportedDocument(activeEditor.document)) {
-                // Force refresh even if it's a translation file when manually triggered
-                await this.sidebarTreeProvider.refresh(activeEditor.document, true);
-            } else {
-                await this.sidebarTreeProvider.refresh(null);
-            }
-        });
-
         // Register open translation file command
         const openTranslationCommand = vscode.commands.registerCommand('elementaryWatson.openTranslationFile', 
             async (workspacePath, locale, key) => {
@@ -184,7 +173,7 @@ class ExtensionActivator {
             }
         );
 
-        this.disposables.push(refreshCommand, openTranslationCommand);
+        this.disposables.push(openTranslationCommand);
     }
 
     /**
