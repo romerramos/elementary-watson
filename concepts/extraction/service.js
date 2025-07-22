@@ -260,17 +260,11 @@ class ExtractionService {
                 }
             }
 
-            // Add new key-value pair
+            // Add new key-value pair (preserving existing key order)
             translations[key] = value;
 
-            // Sort keys alphabetically for consistency
-            const sortedTranslations = {};
-            Object.keys(translations).sort().forEach(sortedKey => {
-                sortedTranslations[sortedKey] = translations[sortedKey];
-            });
-
-            // Write back to file
-            fs.writeFileSync(translationPath, JSON.stringify(sortedTranslations, null, 2) + '\n', 'utf8');
+            // Write back to file maintaining original key order
+            fs.writeFileSync(translationPath, JSON.stringify(translations, null, 2) + '\n', 'utf8');
             
             console.log(`✅ Updated ${locale} locale file: ${key} = "${value}"`);
         } catch (error) {

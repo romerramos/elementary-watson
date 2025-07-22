@@ -13,6 +13,81 @@ class ExtensionActivator {
         this.localeService = new LocaleService();
         this.extractionService = new ExtractionService();
         this.disposables = [];
+        
+        // Debounce utilities for content change updates
+        this.documentUpdateTimeouts = new Map(); // Map of document URI to timeout
+        this.DEBOUNCE_DELAY = 300; // ms to wait after typing stops (will be updated from config)
+    }
+
+    /**
+     * Get the current debounce delay from configuration
+     * @returns {number} Debounce delay in milliseconds
+     */
+    getDebounceDelay() {
+        const config = vscode.workspace.getConfiguration('elementaryWatson');
+        return config.get('updateDelay', 300);
+    }
+
+    /**
+     * Check if real-time updates are enabled
+     * @returns {boolean} True if real-time updates are enabled
+     */
+    isRealtimeUpdatesEnabled() {
+        const config = vscode.workspace.getConfiguration('elementaryWatson');
+        return config.get('realtimeUpdates', true);
+    }
+
+    /**
+     * Debounce utility for document updates
+     * @param {string} documentUri - The document URI
+     * @param {Function} callback - The function to execute after debounce
+     */
+    debounceDocumentUpdate(documentUri, callback) {
+        // Clear existing timeout for this document
+        const existingTimeout = this.documentUpdateTimeouts.get(documentUri);
+        if (existingTimeout) {
+            clearTimeout(existingTimeout);
+        }
+
+        // Set new timeout with current configured delay
+        const delay = this.getDebounceDelay();
+        const timeout = setTimeout(() => {
+            this.documentUpdateTimeouts.delete(documentUri);
+            callback();
+        }, delay);
+
+        this.documentUpdateTimeouts.set(documentUri, timeout);
+    }
+
+    /**
+     * Check if a document change might affect translation calls or their positions
+     * @param {vscode.TextDocumentChangeEvent} event - The change event
+     * @returns {boolean} True if update might be needed
+     */
+    shouldUpdateForChange(event) {
+        const changes = event.contentChanges;
+        if (changes.length === 0) return false;
+
+        // If any change affects multiple lines or contains 'm.' pattern, we should update
+        for (const change of changes) {
+            // Check if change spans multiple lines (affects positioning)
+            const lineChange = change.range.end.line - change.range.start.line;
+            const hasNewlines = change.text.includes('\n') || change.text.includes('\r');
+            
+            if (lineChange > 0 || hasNewlines) {
+                return true; // Multi-line changes always affect positioning
+            }
+
+            // Check if the change might affect translation calls
+            const oldText = change.rangeLength > 0 ? true : false; // Text was deleted
+            const newText = change.text;
+            
+            if (oldText || newText.includes('m.') || newText.includes('()')) {
+                return true; // Potential translation call modification
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -101,6 +176,14 @@ class ExtensionActivator {
         const saveDisposable = vscode.workspace.onDidSaveTextDocument(async (document) => {
             if (this.editorService.isSupportedDocument(document)) {
                 console.log(`\n💾 Save detected: ${path.basename(document.uri.fsPath)}`);
+                
+                // Cancel any pending debounced update for this document since we're doing a full update
+                const existingTimeout = this.documentUpdateTimeouts.get(document.uri.toString());
+                if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                    this.documentUpdateTimeouts.delete(document.uri.toString());
+                }
+                
                 await this.editorService.processDocument(document);
             }
         });
@@ -112,15 +195,68 @@ class ExtensionActivator {
             }
         });
 
+        // Listen for document content changes (new!)
+        const documentChangeDisposable = vscode.workspace.onDidChangeTextDocument(async (event) => {
+            const document = event.document;
+            
+            // Check if real-time updates are enabled
+            if (!this.isRealtimeUpdatesEnabled()) {
+                return;
+            }
+            
+            // Only process supported documents
+            if (!this.editorService.isSupportedDocument(document)) {
+                return;
+            }
+
+            // Only update if the change might affect translation calls or positions
+            if (!this.shouldUpdateForChange(event)) {
+                return;
+            }
+
+            // Debounce the update to avoid too frequent processing
+            this.debounceDocumentUpdate(document.uri.toString(), async () => {
+                try {
+                    // Double-check if real-time updates are still enabled (user might have changed setting)
+                    if (!this.isRealtimeUpdatesEnabled()) {
+                        return;
+                    }
+                    
+                    console.log(`\n✏️  Content change detected: ${path.basename(document.uri.fsPath)} (debounced)`);
+                    await this.editorService.processDocument(document);
+                } catch (error) {
+                    console.error('Error processing document content change:', error);
+                }
+            });
+        });
+
         // Listen for configuration changes
         const configChangeDisposable = vscode.workspace.onDidChangeConfiguration(async (event) => {
             if (event.affectsConfiguration('elementaryWatson.defaultLocale')) {
                 // Refresh current document when locale changes
                 await this.processActiveEditor();
             }
+            
+            if (event.affectsConfiguration('elementaryWatson.realtimeUpdates')) {
+                const enabled = this.isRealtimeUpdatesEnabled();
+                console.log(`🔄 Real-time updates ${enabled ? 'enabled' : 'disabled'}`);
+                
+                if (!enabled) {
+                    // Clear all pending timeouts when real-time updates are disabled
+                    for (const timeout of this.documentUpdateTimeouts.values()) {
+                        clearTimeout(timeout);
+                    }
+                    this.documentUpdateTimeouts.clear();
+                }
+            }
+            
+            if (event.affectsConfiguration('elementaryWatson.updateDelay')) {
+                const delay = this.getDebounceDelay();
+                console.log(`⏱️  Update delay changed to ${delay}ms`);
+            }
         });
 
-        this.disposables.push(saveDisposable, editorChangeDisposable, configChangeDisposable);
+        this.disposables.push(saveDisposable, editorChangeDisposable, documentChangeDisposable, configChangeDisposable);
     }
 
     /**
@@ -140,11 +276,13 @@ class ExtensionActivator {
      * Deactivate the extension
      */
     deactivate() {
-        // Dispose of all resources
-        this.disposables.forEach(disposable => disposable.dispose());
-        this.disposables = [];
+        // Clear all pending timeouts
+        for (const timeout of this.documentUpdateTimeouts.values()) {
+            clearTimeout(timeout);
+        }
+        this.documentUpdateTimeouts.clear();
         
-        // Dispose of the editor service
+        // Dispose of other resources
         this.editorService.dispose();
     }
 }

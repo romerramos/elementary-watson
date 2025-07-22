@@ -5,10 +5,10 @@ A VS Code extension that displays inline translation values for i18n method call
 ## Features
 
 - **Inline Translation Display**: Shows the actual translation text next to `m.methodName()` calls in a faded, italic style
-- **Real-time Updates**: Automatically updates translation displays when you save JS/TS files
+- **Real-time Updates**: Automatically updates translation displays as you type, with intelligent debouncing to maintain performance
 - **Multi-language Support**: Works with multiple locales and configurable locale switching
 - **inlang Project Support**: Automatically detects and uses inlang project configuration
-- **Flexible Configuration**: Command palette integration for easy locale switching
+- **Flexible Configuration**: Command palette integration for easy locale switching and performance tuning
 
 ## Motivation & Disclaimer
 
@@ -67,9 +67,16 @@ Configure the default locale in your VS Code settings:
 
 ```json
 {
-  "elementaryWatson.defaultLocale": "es"
+  "elementaryWatson.defaultLocale": "es",
+  "elementaryWatson.realtimeUpdates": true,
+  "elementaryWatson.updateDelay": 300
 }
 ```
+
+**Available Settings:**
+- `elementaryWatson.defaultLocale`: Default locale for displaying translation labels
+- `elementaryWatson.realtimeUpdates`: Enable/disable real-time updates while typing (default: true)
+- `elementaryWatson.updateDelay`: Delay in milliseconds before updating labels after typing stops (100-2000ms, default: 300ms)
 
 ### Locale Priority Order
 
@@ -80,8 +87,19 @@ The extension determines which locale to display using this priority:
 
 ## How It Works
 
-When you save a JavaScript, TypeScript, or Svelte file, ElementaryWatson:
+ElementaryWatson automatically displays translation values inline with your code. Here's when updates occur:
 
+**Real-time Updates (Default):**
+- As you type: Labels update automatically after a brief pause (configurable delay)
+- Smart detection: Only updates when changes might affect translation calls or their positions
+- Performance optimized: Uses debouncing to avoid excessive processing
+
+**Always Updates On:**
+- File save: Full refresh of all translation labels
+- Tab switching: When switching between editor tabs
+- Locale changes: When you change the display locale
+
+**The Process:**
 1. Scans for `m.methodName()` calls in your code
 2. Determines the current locale (from settings, inlang config, or default)
 3. Locates translation files using inlang `pathPattern` or fallback structure
@@ -153,13 +171,16 @@ Example translation file (`messages/en.json`):
 - Only works with the variable name `m` for translation calls
 - Parameter parsing is basic (supports simple JSON-like objects)
 - Requires translation modules to be valid JavaScript/TypeScript files
-- Updates on file save, not real-time typing
+- Real-time updates can be disabled for performance on very large files
+- Very rapid typing may cause brief delays in label updates (this is by design to maintain performance)
 
 ## Performance
 
-- Lightweight: Only processes files when saved
-- Smart caching: Reloads translation modules as needed
-- Minimal UI impact: Uses VS Code's efficient decoration API
+- **Intelligent Updates**: Only processes changes that could affect translation calls or their positions
+- **Debounced Processing**: Waits for a pause in typing before updating (configurable 100-2000ms)
+- **Smart Caching**: Reloads translation files only when necessary
+- **Minimal UI Impact**: Uses VS Code's efficient decoration API
+- **Configurable**: Can disable real-time updates for very large projects if needed
 
 ## Troubleshooting
 
@@ -179,6 +200,15 @@ If translations don't appear:
 - **Locale mismatch**: Ensure your current locale setting matches available translation files
 - **JSON syntax**: Verify translation files have valid JSON syntax
 - **Path pattern**: For inlang projects, check that `pathPattern` correctly resolves to your files
+
+### Performance Issues
+
+If you experience performance issues with real-time updates:
+
+1. **Increase update delay**: Set `elementaryWatson.updateDelay` to a higher value (e.g., 500-1000ms)
+2. **Disable real-time updates**: Set `elementaryWatson.realtimeUpdates` to `false` - labels will still update on save
+3. **Check file size**: Real-time updates work best with files under 1000 lines
+4. **Monitor console**: Check VS Code Developer Console for performance warnings
 
 ## Contributing
 

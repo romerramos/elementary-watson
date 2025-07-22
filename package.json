@@ -34,6 +34,18 @@
           "description": "Default locale for displaying translation labels. If not set, will use the baseLocale from project.inlang settings or fallback to 'en'.",
           "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
           "patternErrorMessage": "Locale must be in format 'en' or 'en-US'"
+        },
+        "elementaryWatson.realtimeUpdates": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time updates of translation labels while typing. When disabled, labels only update on save."
+        },
+        "elementaryWatson.updateDelay": {
+          "type": "number",
+          "default": 300,
+          "minimum": 100,
+          "maximum": 2000,
+          "description": "Delay in milliseconds before updating translation labels after typing stops (100-2000ms)."
         }
       }
     },
