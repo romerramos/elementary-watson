@@ -120,6 +120,12 @@ class ExtensionActivator {
         // Register sidebar commands
         this.registerSidebarCommands();
 
+        // Register translation label click command
+        this.registerTranslationLabelClickCommand();
+
+        // Register CodeLens provider
+        this.registerCodeLensProvider();
+
         // Set up event listeners
         this.setupEventListeners();
 
@@ -228,6 +234,65 @@ class ExtensionActivator {
         });
 
         this.disposables.push(extractTextCommand);
+    }
+
+    /**
+     * Register the translation label click command
+     */
+    registerTranslationLabelClickCommand() {
+        const clickLabelCommand = vscode.commands.registerCommand('elementaryWatson.clickTranslationLabel', 
+            async (translationKey, filePath) => {
+                try {
+                    // Show the sidebar
+                    await vscode.commands.executeCommand('workbench.view.extension.elementaryWatson');
+                    
+                    // Get the workspace folder to find the current locale
+                    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+                    if (!workspaceFolder) {
+                        vscode.window.showErrorMessage('Cannot determine workspace folder');
+                        return;
+                    }
+
+                    const workspacePath = workspaceFolder.uri.fsPath;
+                    const currentLocale = this.localeService.getCurrentLocale();
+                    
+                    // Refresh sidebar with current document to ensure it shows the clicked key
+                    const activeEditor = vscode.window.activeTextEditor;
+                    if (activeEditor && activeEditor.document.uri.fsPath === filePath) {
+                        await this.sidebarTreeProvider.refresh(activeEditor.document, true);
+                    }
+
+                    // Open the translation file for the current locale and navigate to the key
+                    await this.sidebarService.openTranslationFile(workspacePath, currentLocale, translationKey);
+                    
+                    console.log(`🎯 Clicked translation label: ${translationKey} (locale: ${currentLocale})`);
+                    
+                } catch (error) {
+                    console.error('Error handling translation label click:', error);
+                    vscode.window.showErrorMessage(`Failed to navigate to translation: ${error.message}`);
+                }
+            }
+        );
+
+        this.disposables.push(clickLabelCommand);
+    }
+
+    /**
+     * Register the CodeLens provider
+     */
+    registerCodeLensProvider() {
+        const codeLensProvider = this.editorService.getCodeLensProvider();
+        
+        const codeLensDisposable = vscode.languages.registerCodeLensProvider(
+            [
+                { language: 'javascript', scheme: 'file' },
+                { language: 'typescript', scheme: 'file' },
+                { language: 'svelte', scheme: 'file' }
+            ],
+            codeLensProvider
+        );
+
+        this.disposables.push(codeLensDisposable);
     }
 
     /**
