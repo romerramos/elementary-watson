@@ -49,6 +49,24 @@
         }
       }
     },
+    "views": {
+      "elementaryWatson": [
+        {
+          "id": "elementaryWatsonSidebar",
+          "name": "Translation Keys",
+          "when": "elementaryWatson.showSidebar"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "elementaryWatson",
+          "title": "ElementaryWatson",
+          "icon": "$(globe)"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "elementaryWatson.changeLocale",
@@ -59,8 +77,27 @@
         "command": "elementaryWatson.extractText",
         "title": "Extract Text to Locale",
         "category": "ElementaryWatson"
+      },
+      {
+        "command": "elementaryWatson.openTranslationFile",
+        "title": "Open Translation File",
+        "icon": "$(target)"
+      },
+      {
+        "command": "elementaryWatson.refreshSidebar",
+        "title": "Refresh",
+        "icon": "$(refresh)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "elementaryWatson.refreshSidebar",
+          "when": "view == elementaryWatsonSidebar",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "lint": "eslint .",
