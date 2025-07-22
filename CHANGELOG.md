@@ -2,9 +2,14 @@
 
 All notable changes to the "elementarywatson" extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
 ## [Unreleased]
+
+## [0.3.0] - 2025-07-22
+
+### Removed
+  - **Sidebar Refresh Command**: Removed manual refresh command (`elementaryWatson.refreshSidebar`) from sidebar functionality
+  - Better labels when missing translation or no translations
+  - Better format of titles in the UI
 
 ## [0.2.0] - 2025-07-22
 
@@ -41,5 +46,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - **Multi-language Support**: Activation for JavaScript, TypeScript, and Svelte files
 - **License and Documentation**: Added MIT license and initial documentation
 
+[0.3.0]: https://github.com/romerramos/elementary-watson/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/romerramos/elementary-watson/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/romerramos/elementary-watson/releases/tag/v0.1.0
