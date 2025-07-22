@@ -15,6 +15,29 @@ class ExtractionService {
     }
 
     /**
+     * Strip matching quotes from text if present
+     * @param {string} text The text to process
+     * @returns {string} Text with matching outer quotes removed
+     */
+    stripMatchingQuotes(text) {
+        if (!text || text.length < 2) {
+            return text;
+        }
+
+        const firstChar = text[0];
+        const lastChar = text[text.length - 1];
+        
+        // Check if first and last characters are matching quotes
+        if ((firstChar === '"' && lastChar === '"') ||
+            (firstChar === "'" && lastChar === "'") ||
+            (firstChar === '`' && lastChar === '`')) {
+            return text.slice(1, -1);
+        }
+        
+        return text;
+    }
+
+    /**
      * Extract selected text and add to locale files
      * @param {vscode.TextEditor} editor The active text editor
      * @returns {Promise<boolean>} True if extraction was successful
@@ -26,11 +49,14 @@ class ExtractionService {
                 return false;
             }
 
-            const selectedText = editor.document.getText(editor.selection).trim();
-            if (!selectedText) {
+            const rawSelectedText = editor.document.getText(editor.selection).trim();
+            if (!rawSelectedText) {
                 vscode.window.showErrorMessage('Selected text is empty');
                 return false;
             }
+
+            // Strip matching quotes if present
+            const selectedText = this.stripMatchingQuotes(rawSelectedText);
 
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
             if (!workspaceFolder) {
@@ -40,7 +66,7 @@ class ExtractionService {
 
             const workspacePath = workspaceFolder.uri.fsPath;
 
-            // Check if the exact text already exists in translations
+            // Check if the exact text already exists in translations (using cleaned text)
             const existingKey = await this.findExistingTranslation(workspacePath, selectedText);
             if (existingKey) {
                 // Auto-interpolate with existing key without asking
@@ -60,7 +86,7 @@ class ExtractionService {
                 return false; // User cancelled
             }
 
-            // Add to locale files
+            // Add to locale files (using cleaned text)
             const success = await this.addToLocaleFiles(workspacePath, newKey, selectedText);
             if (!success) {
                 vscode.window.showErrorMessage('Failed to update locale files');
