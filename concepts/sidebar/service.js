@@ -140,15 +140,14 @@ class SidebarService {
     }
 
         /**
-     * Navigate to a specific key in the translation file and highlight its value
+     * Navigate to a specific key in the translation file and highlight its value (supports nested keys)
      * @param {vscode.TextEditor} editor The text editor
-     * @param {string} key The key to find
+     * @param {string} key The key to find (can be nested like "login.inputs.email")
      * @returns {Promise<void>}
      */
     async navigateToKey(editor, key) {
         try {
             const document = editor.document;
-            const text = document.getText();
             
             // Get workspace folder to determine locale from file path
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
@@ -183,14 +182,44 @@ class SidebarService {
             const searchValue = translationValue.endsWith('*') ? 
                 translationValue.slice(0, -1) : translationValue;
             
-            // Search for this value in the file text
-            const valueRegex = new RegExp(`"${searchValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'g');
+            // Try to navigate to the value first
+            if (await this.navigateToValue(editor, searchValue)) {
+                console.log(`🎯 Navigated to key "${key}" (value: "${searchValue}") in ${document.fileName}`);
+                return;
+            }
+            
+            // Fallback: navigate to the key itself
+            if (await this.navigateToKeyName(editor, key)) {
+                console.log(`🎯 Navigated to key "${key}" (key location) in ${document.fileName}`);
+                return;
+            }
+            
+            vscode.window.showWarningMessage(`Key "${key}" not found in translation file`);
+
+        } catch (error) {
+            console.error('Error navigating to key:', error);
+            vscode.window.showErrorMessage(`Failed to navigate to key: ${error.message}`);
+        }
+    }
+
+    /**
+     * Navigate to a translation value in the file
+     * @param {vscode.TextEditor} editor The text editor
+     * @param {string} value The value to find
+     * @returns {Promise<boolean>} True if navigation was successful
+     */
+    async navigateToValue(editor, value) {
+        try {
+            const document = editor.document;
+            const text = document.getText();
+            
+            const valueRegex = new RegExp(`"${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'g');
             const match = valueRegex.exec(text);
             
             if (match) {
                 // Highlight the value (without quotes)
                 const valueStart = match.index + 1; // Skip opening quote
-                const valueEnd = valueStart + searchValue.length;
+                const valueEnd = valueStart + value.length;
                 
                 const startPos = document.positionAt(valueStart);
                 const endPos = document.positionAt(valueEnd);
@@ -199,9 +228,84 @@ class SidebarService {
                 editor.selection = selection;
                 editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
                 
-                console.log(`🎯 Navigated to key "${key}" (value: "${searchValue}") in ${document.fileName}`);
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('Error navigating to value:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Navigate to a translation key in the file (supports nested keys)
+     * @param {vscode.TextEditor} editor The text editor
+     * @param {string} key The key to find (can be nested like "login.inputs.email")
+     * @returns {Promise<boolean>} True if navigation was successful
+     */
+    async navigateToKeyName(editor, key) {
+        try {
+            const document = editor.document;
+            const text = document.getText();
+            
+            if (key.includes('.')) {
+                // Nested key - search for the final key name
+                const keyParts = key.split('.');
+                const finalKey = keyParts[keyParts.length - 1];
+                
+                // Create a regex pattern that matches the nested structure
+                // This is more complex, so we'll use a simpler approach: search for the final key
+                const keyRegex = new RegExp(`"${finalKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*:`, 'g');
+                
+                let match;
+                const matches = [];
+                
+                // Find all matches and look for the one in the right context
+                while ((match = keyRegex.exec(text)) !== null) {
+                    matches.push(match);
+                }
+                
+                // For nested keys, try to find the correct match by checking context
+                for (const match of matches) {
+                    // Simple heuristic: check if we're in the right nested context
+                    const beforeText = text.substring(Math.max(0, match.index - 200), match.index);
+                    const containsParentKeys = keyParts.slice(0, -1).every(parentKey => 
+                        beforeText.includes(`"${parentKey}"`)
+                    );
+                    
+                    if (containsParentKeys || matches.length === 1) {
+                        const keyStart = match.index + 1; // Skip opening quote
+                        const keyEnd = keyStart + finalKey.length;
+                        
+                        const startPos = document.positionAt(keyStart);
+                        const endPos = document.positionAt(keyEnd);
+                        
+                        const selection = new vscode.Selection(startPos, endPos);
+                        editor.selection = selection;
+                        editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
+                        
+                        return true;
+                    }
+                }
+                
+                // If no good context match, use first match
+                if (matches.length > 0) {
+                    const match = matches[0];
+                    const keyStart = match.index + 1; // Skip opening quote
+                    const keyEnd = keyStart + finalKey.length;
+                    
+                    const startPos = document.positionAt(keyStart);
+                    const endPos = document.positionAt(keyEnd);
+                    
+                    const selection = new vscode.Selection(startPos, endPos);
+                    editor.selection = selection;
+                    editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
+                    
+                    return true;
+                }
             } else {
-                // Fallback: just navigate to the key itself
+                // Flat key - simple search
                 const keyRegex = new RegExp(`"${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'g');
                 const keyMatch = keyRegex.exec(text);
                 
@@ -213,15 +317,14 @@ class SidebarService {
                     editor.selection = selection;
                     editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
                     
-                    console.log(`🎯 Navigated to key "${key}" (key location) in ${document.fileName}`);
-                } else {
-                    vscode.window.showWarningMessage(`Key "${key}" not found in translation file`);
+                    return true;
                 }
             }
-
+            
+            return false;
         } catch (error) {
-            console.error('Error navigating to key:', error);
-            vscode.window.showErrorMessage(`Failed to navigate to key: ${error.message}`);
+            console.error('Error navigating to key name:', error);
+            return false;
         }
     }
 

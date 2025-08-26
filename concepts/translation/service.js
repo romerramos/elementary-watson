@@ -11,24 +11,45 @@ class TranslationService {
     }
 
     /**
-     * Find all m.methodName() calls in text
+     * Find all m.methodName() and m["nested.key"]() calls in text
      * @param {string} text The source code text to analyze
      * @returns {Array} Array of translation call objects
      */
     findTranslationCalls(text) {
         const calls = [];
-        // Pattern to match m.methodName() or m.methodName(params)
-        const pattern = /\bm\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(\s*([^)]*)\s*\)/g;
+        
+        // Pattern 1: m.methodName() or m.methodName(params) - original flat key syntax
+        const flatPattern = /\bm\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(\s*([^)]*)\s*\)/g;
+        
+        // Pattern 2: m["nested.key"]() or m['nested.key']() - new nested key syntax
+        const nestedPattern = /\bm\[(['"`])([^'"]+)\1\]\s*\(\s*([^)]*)\s*\)/g;
         
         let match;
-        while ((match = pattern.exec(text)) !== null) {
+        
+        // Find flat key patterns
+        while ((match = flatPattern.exec(text)) !== null) {
             calls.push({
                 methodName: match[1],
                 params: match[2].trim(),
                 start: match.index,
-                end: match.index + match[0].length
+                end: match.index + match[0].length,
+                keyType: 'flat'
             });
         }
+        
+        // Find nested key patterns
+        while ((match = nestedPattern.exec(text)) !== null) {
+            calls.push({
+                methodName: match[2], // The key inside the quotes
+                params: match[3].trim(),
+                start: match.index,
+                end: match.index + match[0].length,
+                keyType: 'nested'
+            });
+        }
+        
+        // Sort by position to maintain order
+        calls.sort((a, b) => a.start - b.start);
         
         return calls;
     }
@@ -78,17 +99,29 @@ class TranslationService {
     }
 
     /**
-     * Get translation value for a specific key
+     * Get translation value for a specific key (supports nested dot notation)
      * @param {Object} translations The translations object
-     * @param {string} key The translation key
+     * @param {string} key The translation key (can be nested like "login.inputs.email")
      * @returns {string|null} The translation value or null if not found
      */
     getTranslation(translations, key) {
-        if (!translations || !translations[key]) {
+        if (!translations) {
             return null;
         }
 
-        const value = translations[key];
+        let value;
+        
+        // Try nested key lookup first (e.g., "login.inputs.email")
+        if (key.includes('.')) {
+            value = this.getNestedValue(translations, key);
+        } else {
+            // Fallback to flat key lookup for backward compatibility
+            value = translations[key];
+        }
+        
+        if (value === undefined || value === null) {
+            return null;
+        }
 
         // Case 1: Simple string value - return as-is
         if (typeof value === 'string') {
@@ -105,6 +138,18 @@ class TranslationService {
 
         // Case 3: Unsupported format
         return null;
+    }
+
+    /**
+     * Get nested value from object using dot notation
+     * @param {Object} obj The object to traverse
+     * @param {string} path The dot-separated path (e.g., "login.inputs.email")
+     * @returns {any} The value at the path or undefined if not found
+     */
+    getNestedValue(obj, path) {
+        return path.split('.').reduce((current, key) => {
+            return (current && current[key] !== undefined) ? current[key] : undefined;
+        }, obj);
     }
 
     /**
