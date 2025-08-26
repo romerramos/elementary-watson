@@ -94,7 +94,7 @@ class ExtractionService {
             }
 
             // Replace selected text with key call
-            const keyCall = interpolationType === 'template' ? `{m.${newKey}()}` : `m.${newKey}()`;
+            const keyCall = this.formatKeyCall(newKey, interpolationType);
             return await this.replaceSelectedText(editor, keyCall);
 
         } catch (error) {
@@ -105,7 +105,7 @@ class ExtractionService {
     }
 
     /**
-     * Find if the exact text already exists in any translation
+     * Find if the exact text already exists in any translation (supports nested keys)
      * @param {string} workspacePath The workspace root path
      * @param {string} text The text to search for
      * @returns {Promise<string|null>} The existing key or null if not found
@@ -120,10 +120,9 @@ class ExtractionService {
             const baseTranslations = await this.translationRepository.loadTranslations(baseTranslationPath, baseLocale);
             
             if (baseTranslations) {
-                for (const [key, value] of Object.entries(baseTranslations)) {
-                    if (value === text) {
-                        return key;
-                    }
+                const foundKey = this.searchInTranslations(baseTranslations, text);
+                if (foundKey) {
+                    return foundKey;
                 }
             }
 
@@ -132,6 +131,30 @@ class ExtractionService {
             console.error('Error finding existing translation:', error);
             return null;
         }
+    }
+
+    /**
+     * Recursively search for text in translations (supports nested objects)
+     * @param {Object} obj The translations object to search
+     * @param {string} text The text to search for
+     * @param {string} prefix The key prefix for nested objects
+     * @returns {string|null} The found key or null
+     */
+    searchInTranslations(obj, text, prefix = '') {
+        for (const [key, value] of Object.entries(obj)) {
+            const currentKey = prefix ? `${prefix}.${key}` : key;
+            
+            if (typeof value === 'string' && value === text) {
+                return currentKey;
+            } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                // Recursively search nested objects
+                const nestedResult = this.searchInTranslations(value, text, currentKey);
+                if (nestedResult) {
+                    return nestedResult;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -236,10 +259,10 @@ class ExtractionService {
     }
 
     /**
-     * Update a specific locale file with new key-value pair
+     * Update a specific locale file with new key-value pair (supports nested keys)
      * @param {string} workspacePath The workspace root path
      * @param {string} locale The locale to update
-     * @param {string} key The translation key
+     * @param {string} key The translation key (can be nested like "login.inputs.email")
      * @param {string} value The translation value
      * @returns {Promise<void>}
      */
@@ -260,8 +283,8 @@ class ExtractionService {
                 }
             }
 
-            // Add new key-value pair (preserving existing key order)
-            translations[key] = value;
+            // Set the nested or flat key-value pair
+            this.setNestedValue(translations, key, value);
 
             // Write back to file maintaining original key order
             fs.writeFileSync(translationPath, JSON.stringify(translations, null, 2) + '\n', 'utf8');
@@ -270,6 +293,54 @@ class ExtractionService {
         } catch (error) {
             console.error(`Error updating locale file for ${locale}:`, error);
             throw error;
+        }
+    }
+
+    /**
+     * Set nested value in object using dot notation
+     * @param {Object} obj The object to modify
+     * @param {string} path The dot-separated path (e.g., "login.inputs.email")
+     * @param {any} value The value to set
+     */
+    setNestedValue(obj, path, value) {
+        if (!path.includes('.')) {
+            // Simple flat key
+            obj[path] = value;
+            return;
+        }
+
+        const keys = path.split('.');
+        const lastKey = keys.pop();
+        
+        // Navigate to the parent object, creating nested objects as needed
+        let current = obj;
+        for (const key of keys) {
+            if (current[key] === undefined || typeof current[key] !== 'object' || Array.isArray(current[key])) {
+                current[key] = {};
+            }
+            current = current[key];
+        }
+        
+        current[lastKey] = value;
+    }
+
+    /**
+     * Format key call based on key type and interpolation preference
+     * @param {string} key The translation key
+     * @param {string} interpolationType 'template' or 'code'
+     * @returns {string} The formatted key call
+     */
+    formatKeyCall(key, interpolationType) {
+        const isTemplate = interpolationType === 'template';
+        
+        if (key.includes('.')) {
+            // Nested key - use bracket notation
+            const keyCall = `m["${key}"]()`;
+            return isTemplate ? `{${keyCall}}` : keyCall;
+        } else {
+            // Flat key - use dot notation for backward compatibility
+            const keyCall = `m.${key}()`;
+            return isTemplate ? `{${keyCall}}` : keyCall;
         }
     }
 
@@ -307,7 +378,7 @@ class ExtractionService {
             return false;
         }
 
-        const keyCall = interpolationType === 'template' ? `{m.${existingKey}()}` : `m.${existingKey}()`;
+        const keyCall = this.formatKeyCall(existingKey, interpolationType);
         return await this.replaceSelectedText(editor, keyCall);
     }
 }
