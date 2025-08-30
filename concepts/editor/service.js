@@ -16,13 +16,13 @@ class EditorService {
     }
 
     /**
-     * Check if document is supported (JavaScript, TypeScript, or Svelte)
+     * Check if document is supported (JavaScript, JavaScript with JSX, TypeScript, TypeScript with JSX, or Svelte)
      * @param {vscode.TextDocument} document 
      * @returns {boolean} True if the document is supported
      */
     isSupportedDocument(document) {
         const languageId = document.languageId;
-        return ['javascript', 'typescript', 'svelte'].includes(languageId);
+        return ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'svelte'].includes(languageId);
     }
 
     /**
